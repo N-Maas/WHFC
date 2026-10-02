@@ -124,7 +124,7 @@ namespace whfc {
                 if (!isTarget(u)) {
                     level[u] = next_level[u];
                 } else {
-                    std::atomic_ref<Flow>(flow_value).fetch_add(excess_diff[u], std::memory_order::relaxed);
+                    std::atomic_ref(flow_value).fetch_add(excess_diff[u], std::memory_order::relaxed);
                 }
                 excess[u] += excess_diff[u];
                 excess_diff[u] = 0;
@@ -133,7 +133,7 @@ namespace whfc {
                 const Node u = next_active[i];
                 excess[u] += excess_diff[u];
                 if (isTarget(u) && excess_diff[u] > 0) {
-                    std::atomic_ref<Flow>(flow_value).fetch_add(excess_diff[u], std::memory_order::relaxed);
+                    std::atomic_ref(flow_value).fetch_add(excess_diff[u], std::memory_order::relaxed);
                 }
                 excess_diff[u] = 0;
             });
@@ -168,7 +168,7 @@ namespace whfc {
                         } else if (d > 0) {
                             std::atomic_ref(flow[inNodeIncidenceIndex(i)]).fetch_add(d, std::memory_order::relaxed);
                             my_excess -= d;
-                            std::atomic_ref<Flow>(excess_diff[e_in]).fetch_add(d, std::memory_order::relaxed);
+                            std::atomic_ref(excess_diff[e_in]).fetch_add(d, std::memory_order::relaxed);
                             push(e_in);
                         }
                     } else if (my_level <= level[e_in] && d > 0) {
@@ -192,7 +192,7 @@ namespace whfc {
                                 assert(flow[outNodeIncidenceIndex(i)] <= hg.capacity(e));
                                 std::atomic_ref(flow[outNodeIncidenceIndex(i)]).fetch_sub(d, std::memory_order::relaxed);
                                 my_excess -= d;
-                                std::atomic_ref<Flow>(excess_diff[e_out]).fetch_add(d, std::memory_order::relaxed);
+                                std::atomic_ref(excess_diff[e_out]).fetch_add(d, std::memory_order::relaxed);
                                 push(e_out);
                             }
                         }
@@ -214,7 +214,7 @@ namespace whfc {
                 push(u);
             }
             // excess[u] serves as indicator for other nodes that u is active --> update later
-            std::atomic_ref<Flow>(excess_diff[u]).fetch_sub((excess[u] - my_excess), std::memory_order::relaxed);
+            std::atomic_ref(excess_diff[u]).fetch_sub((excess[u] - my_excess), std::memory_order::relaxed);
             return work;
         }
 
@@ -244,7 +244,7 @@ namespace whfc {
                         if (d > 0) {
                             std::atomic_ref(flow[bridgeEdgeIndex(e)]).fetch_add(d, std::memory_order::relaxed);
                             my_excess -= d;
-                            std::atomic_ref<Flow>(excess_diff[e_out]).fetch_add(d, std::memory_order::relaxed);
+                            std::atomic_ref(excess_diff[e_out]).fetch_add(d, std::memory_order::relaxed);
                             push(e_out);
                         }
                     }
@@ -268,7 +268,7 @@ namespace whfc {
                             d = std::min(d, my_excess);
                             std::atomic_ref(flow[j]).fetch_sub(d, std::memory_order::relaxed);
                             my_excess -= d;
-                            std::atomic_ref<Flow>(excess_diff[v]).fetch_add(d, std::memory_order::relaxed);
+                            std::atomic_ref(excess_diff[v]).fetch_add(d, std::memory_order::relaxed);
                             push(v);
                         }
                     } else if (d > 0 && my_level <= level[v]) {
@@ -288,7 +288,7 @@ namespace whfc {
                 push(e_in);
             }
             // excess[u] serves as indicator for other nodes that u is active --> update later
-            std::atomic_ref<Flow>(excess_diff[e_in]).fetch_sub((excess[e_in] - my_excess), std::memory_order::relaxed);
+            std::atomic_ref(excess_diff[e_in]).fetch_sub((excess[e_in] - my_excess), std::memory_order::relaxed);
             return work;
         }
 
@@ -348,7 +348,7 @@ namespace whfc {
                         if (d > 0) {
                             std::atomic_ref(flow[bridgeEdgeIndex(e)]).fetch_sub(d, std::memory_order::relaxed);
                             my_excess -= d;
-                            std::atomic_ref<Flow>(excess_diff[e_in]).fetch_add(d, std::memory_order::relaxed);
+                            std::atomic_ref(excess_diff[e_in]).fetch_add(d, std::memory_order::relaxed);
                             push(e_in);
                         }
                         work++;
@@ -369,7 +369,7 @@ namespace whfc {
                 push(e_out);
             }
             // excess[u] serves as indicator for other nodes that u is active --> update later
-            std::atomic_ref<Flow>(excess_diff[e_out]).fetch_sub((excess[e_out] - my_excess), std::memory_order::relaxed);
+            std::atomic_ref(excess_diff[e_out]).fetch_sub((excess[e_out] - my_excess), std::memory_order::relaxed);
             return work;
         }
 
@@ -398,7 +398,7 @@ namespace whfc {
                 });
 
                 if (!isTarget(u) && excess[u] > 0 && last_activated[u] != round) { // add previously mis-labeled nodes to active queue, if not already contained
-                    size_t pos = std::atomic_ref<size_t>(num_active).fetch_add(1, std::memory_order::relaxed);
+                    size_t pos = std::atomic_ref(num_active).fetch_add(1, std::memory_order::relaxed);
                     active[pos] = u;
                 }
 
@@ -450,7 +450,7 @@ namespace whfc {
                     scanForward(u, [&](const Node v) {
                         assert(!isTargetReachable(v));
                         if (!isSourceReachable(v) &&
-                            std::atomic_ref<uint32_t>(reach[v]).exchange(source_reachable_stamp, std::memory_order::acq_rel) != source_reachable_stamp) {
+                            std::atomic_ref(reach[v]).exchange(source_reachable_stamp, std::memory_order::acq_rel) != source_reachable_stamp) {
                             assert(flow_changed || excess[v] == 0);
                             next_layer.push_back(v);
                         }
