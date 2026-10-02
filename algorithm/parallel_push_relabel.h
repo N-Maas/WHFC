@@ -160,13 +160,13 @@ namespace whfc {
                     Node e_in = edgeToInNode(e);
                     Flow d = my_excess;
                     if constexpr (capacitate_incoming_edges_of_in_nodes) {
-                        d = std::min(d, hg.capacity(e) - flow[inNodeIncidenceIndex(i)]);
+                        d = std::min(d, hg.capacity(e) - std::atomic_ref(flow[inNodeIncidenceIndex(i)]).load(std::memory_order::relaxed));
                     }
                     if (my_level == level[e_in] + 1) {
                         if (excess[e_in] > 0 && !winEdge(u, e_in)) {
                             skipped = true;
                         } else if (d > 0) {
-                            flow[inNodeIncidenceIndex(i)] += d;
+                            std::atomic_ref(flow[inNodeIncidenceIndex(i)]).fetch_add(d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref<Flow>(excess_diff[e_in]).fetch_add(d, std::memory_order::relaxed);
                             push(e_in);
@@ -190,13 +190,14 @@ namespace whfc {
                             const Flow d = std::min(my_excess, flow[outNodeIncidenceIndex(i)]);
                             if (d > 0) {
                                 assert(flow[outNodeIncidenceIndex(i)] <= hg.capacity(e));
-                                flow[outNodeIncidenceIndex(i)] -= d;
+                                std::atomic_ref(flow[outNodeIncidenceIndex(i)]).fetch_sub(d, std::memory_order::relaxed);
                                 my_excess -= d;
                                 std::atomic_ref<Flow>(excess_diff[e_out]).fetch_add(d, std::memory_order::relaxed);
                                 push(e_out);
                             }
                         }
-                    } else if (my_level <= level[e_out] && flow[outNodeIncidenceIndex(i)] > 0) {
+                    } else if (my_level <= level[e_out] &&
+                               std::atomic_ref(flow[outNodeIncidenceIndex(i)]).load(std::memory_order_relaxed) > 0) {
                         new_level = std::min(new_level, level[e_out]);
                     }
                 }
@@ -239,16 +240,16 @@ namespace whfc {
                     if (excess[e_out] > 0 && !winEdge(e_in, e_out)) {
                         skipped = true;
                     } else {
-                        const Flow d = std::min(hg.capacity(e) - flow[bridgeEdgeIndex(e)], my_excess);
+                        const Flow d = std::min(hg.capacity(e) - std::atomic_ref(flow[bridgeEdgeIndex(e)]).load(std::memory_order::relaxed), my_excess);
                         if (d > 0) {
-                            flow[bridgeEdgeIndex(e)] += d;
+                            std::atomic_ref(flow[bridgeEdgeIndex(e)]).fetch_add(d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref<Flow>(excess_diff[e_out]).fetch_add(d, std::memory_order::relaxed);
                             push(e_out);
                         }
                     }
                     work++;
-                } else if (my_level <= level[e_out] && flow[bridgeEdgeIndex(e)] < hg.capacity(e)) {
+                } else if (my_level <= level[e_out] && std::atomic_ref(flow[bridgeEdgeIndex(e)]).load(std::memory_order::relaxed) < hg.capacity(e)) {
                     new_level = std::min(new_level, level[e_out]);
                 }
 
@@ -259,13 +260,13 @@ namespace whfc {
                     }
                     Node v = p.pin;
                     size_t j = inNodeIncidenceIndex(p.he_inc_iter);
-                    Flow d = flow[j];
+                    Flow d = std::atomic_ref(flow[j]).load(std::memory_order::relaxed);
                     if (my_level == level[v] + 1) {
                         if (excess[v] > 0 && !winEdge(e_in, v)) {
                             skipped = true;
                         } else if (d > 0) {
                             d = std::min(d, my_excess);
-                            flow[j] -= d;
+                            std::atomic_ref(flow[j]).fetch_sub(d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref<Flow>(excess_diff[v]).fetch_add(d, std::memory_order::relaxed);
                             push(v);
@@ -323,9 +324,9 @@ namespace whfc {
                             skipped = true;
                         } else {
                             assert(d > 0 && d <= hg.capacity(e) - flow[outNodeIncidenceIndex(p.he_inc_iter)]);
-                            flow[outNodeIncidenceIndex(p.he_inc_iter)] += d;
+                            std::atomic_ref(flow[outNodeIncidenceIndex(p.he_inc_iter)]).fetch_add(d, std::memory_order::relaxed);
                             my_excess -= d;
-                            std::atomic_ref<Flow>(excess_diff[v]).fetch_add(d, std::memory_order::relaxed);
+                            std::atomic_ref(excess_diff[v]).fetch_add(d, std::memory_order::relaxed);
                             push(v);
                         }
                     } else if (my_level <= level[v]) {
@@ -345,14 +346,15 @@ namespace whfc {
                     } else {
                         Flow d = std::min(flow[bridgeEdgeIndex(e)], my_excess);
                         if (d > 0) {
-                            flow[bridgeEdgeIndex(e)] -= d;
+                            std::atomic_ref(flow[bridgeEdgeIndex(e)]).fetch_sub(d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref<Flow>(excess_diff[e_in]).fetch_add(d, std::memory_order::relaxed);
                             push(e_in);
                         }
                         work++;
                     }
-                } else if (my_level <= level[e_in] && flow[bridgeEdgeIndex(e)] > 0) {
+                } else if (my_level <= level[e_in] &&
+                           std::atomic_ref(flow[bridgeEdgeIndex(e)]).load(std::memory_order_relaxed) > 0) {
                     new_level = std::min(new_level, level[e_in]);
                 }
 
@@ -388,8 +390,9 @@ namespace whfc {
             auto scan = [&](Node u, int dist) {
                 auto next_layer = next_active.local_buffer();
                 scanBackward(u, [&](const Node v) {
-                    if (!isSource(v) && !isTarget(v) && level[v] == max_level &&
-                        std::atomic_ref<int>(level[v]).exchange(dist, std::memory_order::acq_rel) == max_level) {
+                    if (!isSource(v) && !isTarget(v) &&
+                        std::atomic_ref(level[v]).load(std::memory_order_relaxed) == max_level &&
+                        std::atomic_ref(level[v]).exchange(dist, std::memory_order::acq_rel) == max_level) {
                         next_layer.push_back(v);
                     }
                 });
@@ -401,7 +404,7 @@ namespace whfc {
 
                 if constexpr (set_reachability) {
                     if (!isTarget(u)) {
-                        reach[u] = target_reachable_stamp;
+                        std::atomic_ref(reach[u]).store(target_reachable_stamp, std::memory_order::relaxed);
                     }
                 }
             };
@@ -615,9 +618,12 @@ namespace whfc {
 
         vec<uint32_t> last_activated;
         uint32_t round = 0;
+
         bool activate(Node u) {
-            return last_activated[u] != round && std::atomic_ref<uint32_t>(last_activated[u]).exchange(round, std::memory_order::acq_rel) != round;
+            auto last_activated_ref = std::atomic_ref(last_activated[u]);
+            return last_activated_ref.load(std::memory_order_relaxed) != round && last_activated_ref.exchange(round, std::memory_order::acq_rel) != round;
         }
+
         void resetRound() {
             if (++round == 0) {
                 last_activated.assign(max_level, 0);
