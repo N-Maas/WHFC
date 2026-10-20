@@ -166,7 +166,8 @@ namespace whfc {
                         if (excess[e_in] > 0 && !winEdge(u, e_in)) {
                             skipped = true;
                         } else if (d > 0) {
-                            std::atomic_ref(flow[inNodeIncidenceIndex(i)]).fetch_add(d, std::memory_order::relaxed);
+                            size_t j = inNodeIncidenceIndex(i);
+                            std::atomic_ref(flow[j]).store(flow[j] + d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref(excess_diff[e_in]).fetch_add(d, std::memory_order::relaxed);
                             push(e_in);
@@ -189,8 +190,9 @@ namespace whfc {
                         } else {
                             const Flow d = std::min(my_excess, flow[outNodeIncidenceIndex(i)]);
                             if (d > 0) {
-                                assert(flow[outNodeIncidenceIndex(i)] <= hg.capacity(e));
-                                std::atomic_ref(flow[outNodeIncidenceIndex(i)]).fetch_sub(d, std::memory_order::relaxed);
+                                size_t j = outNodeIncidenceIndex(i);
+                                assert(flow[j] <= hg.capacity(e));
+                                std::atomic_ref(flow[j]).store(flow[j] - d, std::memory_order::relaxed);
                                 my_excess -= d;
                                 std::atomic_ref(excess_diff[e_out]).fetch_add(d, std::memory_order::relaxed);
                                 push(e_out);
@@ -240,9 +242,10 @@ namespace whfc {
                     if (excess[e_out] > 0 && !winEdge(e_in, e_out)) {
                         skipped = true;
                     } else {
-                        const Flow d = std::min(hg.capacity(e) - std::atomic_ref(flow[bridgeEdgeIndex(e)]).load(std::memory_order::relaxed), my_excess);
+                        size_t j = bridgeEdgeIndex(e);
+                        const Flow d = std::min(hg.capacity(e) - flow[j], my_excess);
                         if (d > 0) {
-                            std::atomic_ref(flow[bridgeEdgeIndex(e)]).fetch_add(d, std::memory_order::relaxed);
+                            std::atomic_ref(flow[j]).store(flow[j] + d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref(excess_diff[e_out]).fetch_add(d, std::memory_order::relaxed);
                             push(e_out);
@@ -266,7 +269,7 @@ namespace whfc {
                             skipped = true;
                         } else if (d > 0) {
                             d = std::min(d, my_excess);
-                            std::atomic_ref(flow[j]).fetch_sub(d, std::memory_order::relaxed);
+                            std::atomic_ref(flow[j]).store(flow[j] - d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref(excess_diff[v]).fetch_add(d, std::memory_order::relaxed);
                             push(v);
@@ -323,8 +326,9 @@ namespace whfc {
                         if (excess[v] > 0 && !winEdge(e_out, v)) {
                             skipped = true;
                         } else {
-                            assert(d > 0 && d <= hg.capacity(e) - flow[outNodeIncidenceIndex(p.he_inc_iter)]);
-                            std::atomic_ref(flow[outNodeIncidenceIndex(p.he_inc_iter)]).fetch_add(d, std::memory_order::relaxed);
+                            size_t j = outNodeIncidenceIndex(p.he_inc_iter);
+                            assert(d > 0 && d <= hg.capacity(e) - flow[j]);
+                            std::atomic_ref(flow[j]).store(flow[j] + d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref(excess_diff[v]).fetch_add(d, std::memory_order::relaxed);
                             push(v);
@@ -344,9 +348,10 @@ namespace whfc {
                     if (excess[e_in] > 0 && !winEdge(e_out, e_in)) {
                         skipped = true;
                     } else {
-                        Flow d = std::min(flow[bridgeEdgeIndex(e)], my_excess);
+                        size_t j = bridgeEdgeIndex(e);
+                        Flow d = std::min(flow[j], my_excess);
                         if (d > 0) {
-                            std::atomic_ref(flow[bridgeEdgeIndex(e)]).fetch_sub(d, std::memory_order::relaxed);
+                            std::atomic_ref(flow[j]).store(flow[j] - d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref(excess_diff[e_in]).fetch_add(d, std::memory_order::relaxed);
                             push(e_in);
