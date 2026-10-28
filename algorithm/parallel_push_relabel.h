@@ -166,7 +166,7 @@ namespace whfc {
                         if (excess[e_in] > 0 && !winEdge(u, e_in)) {
                             skipped = true;
                         } else if (d > 0) {
-                            size_t j = inNodeIncidenceIndex(i);
+                            const size_t j = inNodeIncidenceIndex(i);
                             std::atomic_ref(flow[j]).store(flow[j] + d, std::memory_order::relaxed);
                             my_excess -= d;
                             std::atomic_ref(excess_diff[e_in]).fetch_add(d, std::memory_order::relaxed);
@@ -190,7 +190,7 @@ namespace whfc {
                         } else {
                             const Flow d = std::min(my_excess, flow[outNodeIncidenceIndex(i)]);
                             if (d > 0) {
-                                size_t j = outNodeIncidenceIndex(i);
+                                const size_t j = outNodeIncidenceIndex(i);
                                 assert(flow[j] <= hg.capacity(e));
                                 std::atomic_ref(flow[j]).store(flow[j] - d, std::memory_order::relaxed);
                                 my_excess -= d;
@@ -242,7 +242,7 @@ namespace whfc {
                     if (excess[e_out] > 0 && !winEdge(e_in, e_out)) {
                         skipped = true;
                     } else {
-                        size_t j = bridgeEdgeIndex(e);
+                        const size_t j = bridgeEdgeIndex(e);
                         const Flow d = std::min(hg.capacity(e) - flow[j], my_excess);
                         if (d > 0) {
                             std::atomic_ref(flow[j]).store(flow[j] + d, std::memory_order::relaxed);
@@ -262,7 +262,7 @@ namespace whfc {
                         break;
                     }
                     Node v = p.pin;
-                    size_t j = inNodeIncidenceIndex(p.he_inc_iter);
+                    const size_t j = inNodeIncidenceIndex(p.he_inc_iter);
                     Flow d = std::atomic_ref(flow[j]).load(std::memory_order::relaxed);
                     if (my_level == level[v] + 1) {
                         if (excess[v] > 0 && !winEdge(e_in, v)) {
@@ -326,7 +326,7 @@ namespace whfc {
                         if (excess[v] > 0 && !winEdge(e_out, v)) {
                             skipped = true;
                         } else {
-                            size_t j = outNodeIncidenceIndex(p.he_inc_iter);
+                            const size_t j = outNodeIncidenceIndex(p.he_inc_iter);
                             assert(d > 0 && d <= hg.capacity(e) - flow[j]);
                             std::atomic_ref(flow[j]).store(flow[j] + d, std::memory_order::relaxed);
                             my_excess -= d;
@@ -348,7 +348,7 @@ namespace whfc {
                     if (excess[e_in] > 0 && !winEdge(e_out, e_in)) {
                         skipped = true;
                     } else {
-                        size_t j = bridgeEdgeIndex(e);
+                        const size_t j = bridgeEdgeIndex(e);
                         Flow d = std::min(flow[j], my_excess);
                         if (d > 0) {
                             std::atomic_ref(flow[j]).store(flow[j] - d, std::memory_order::relaxed);
